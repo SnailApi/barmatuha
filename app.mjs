@@ -71,8 +71,9 @@ const mass_claimer = async (wallet_state, wallets, async_events) => {
                 }
                 if (!item.transfered && item.claimed && item.transfer_to) {
                     const balance = await BARMATUHA_CONTRACT.methods.balanceOf(item.address).call();
-                    const human_balance = parseFloat(ethers.utils.formatEther(balance));
-                    const to_transfer = ethers.utils.parseEther(`${human_balance - human_balance * 0.015}`);
+                    //const human_balance = parseFloat(ethers.utils.formatEther(balance));
+                    //const to_transfer = ethers.utils.parseEther(`${human_balance - human_balance * 0.015}`);
+                    const to_transfer = balance;
 
                     try {
                         await transfer_to(item, to_transfer, item.transfer_to);
