@@ -11,7 +11,7 @@ const web3 = new Web3(process.env.RPC);
 const CLAIM_ADDRESS = "0x67a24CE4321aB3aF51c2D0a4801c3E111D88C9d9";
 const CLAIM_CONTRACT = new web3.eth.Contract(CLAIM_ABI, CLAIM_ADDRESS);
 
-const BARMATUHA_ADDRESS = "0xfc5a1a6eb076a2c7ad06ed22c90d7e710e35ad0a";
+const BARMATUHA_ADDRESS = "0x912ce59144191c1204e64559fe8253a0e49e6548";
 const BARMATUHA_CONTRACT = new web3.eth.Contract(ARB_ABI, BARMATUHA_ADDRESS);
 
 const claim_call = async (item) => {
