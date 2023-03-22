@@ -5,7 +5,7 @@ import Web3 from "web3";
 import * as dotenv from "dotenv";
 dotenv.config();
 
-import { CLAIM_ABI, ARB_ABI } from "./abi.mjs";
+import { CLAIM_ABI, ARB_ABI, MULTICALL_ABI } from "./abi.mjs";
 
 const web3 = new Web3(process.env.RPC);
 const CLAIM_ADDRESS = "0x67a24CE4321aB3aF51c2D0a4801c3E111D88C9d9";
@@ -13,6 +13,11 @@ const CLAIM_CONTRACT = new web3.eth.Contract(CLAIM_ABI, CLAIM_ADDRESS);
 
 const BARMATUHA_ADDRESS = "0x912ce59144191c1204e64559fe8253a0e49e6548";
 const BARMATUHA_CONTRACT = new web3.eth.Contract(ARB_ABI, BARMATUHA_ADDRESS);
+
+const MULTICALL_ADDRESS = "0x842eC2c7D803033Edf55E478F461FC547Bc54EB2";
+const MULTICALL_CONTRACT = new web3.eth.Contract(MULTICALL_ABI, MULTICALL_ADDRESS);
+
+const CLAIM_START = 16890400;
 
 const claim_call = async (item) => {
     const query = CLAIM_CONTRACT.methods.claim();
@@ -58,15 +63,23 @@ const mass_claimer = async (wallet_state, wallets, async_events) => {
             async_events,
             async (item) => {
                 if (!item.claimed) {
-                    try {
-                        await claim_call(item);
-                        console.log(`::INFO CLAIMED: ${item.address}`);
-                        info.claimed += 1;
-                        item.claimed = true;
-                        wallet_state.push("");
-                    } catch (e) {
-                        console.log(`::ERROR NOT CLAIMED: ${item.address} ${e.message}`);
-                        info.claim_error += 1;
+                    while (true) {
+                        try {
+                            await claim_call(item);
+                            console.log(`::INFO CLAIMED: ${item.address}`);
+                            info.claimed += 1;
+                            item.claimed = true;
+                            wallet_state.push("");
+                            break;
+                        } catch (e) {
+                            console.log(`::ERROR NOT CLAIMED: ${item.address} ${e.message}`);
+                            info.claim_error += 1;
+                            if (e.message.indexOf("TokenDistributor: claim not started") > -1) {
+                                continue;
+                            } else {
+                                break;
+                            }
+                        }
                     }
                 }
                 if (!item.transfered && item.claimed && item.transfer_to) {
@@ -157,6 +170,17 @@ const claim_info = async (wallet_state, wallets) => {
         case "claim":
             {
                 try {
+                    console.log(`::INFO WAITING FOR THE L1 BLOCK: ${CLAIM_START}`);
+                    while (true) {
+                        try {
+                            const block = await MULTICALL_CONTRACT.methods.getL1BlockNumber().call();
+                            if (block >= CLAIM_START) {
+                                break;
+                            }
+                        } catch {
+                            // continue regardless of error
+                        }
+                    }
                     console.log(`::INFO CLAIM STARTED`);
                     const info = await mass_claimer(save_wallet_state, WALLETS, async_events);
                     console.log(`::INFO CLAIM COMPLETED: ${JSON.stringify(info)}`);
