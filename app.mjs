@@ -204,7 +204,19 @@ const claim_info = async (wallet_state, wallets) => {
         case "set-cex":
             {
                 console.log(`::INFO START SET DEX ADDRESSES`);
+                const unique_cex = [];
+                let duplicates = 0;
                 const dex_deposit_addresses = readFileSync("cex", "utf-8").split("\n");
+                for (let transfer_to of dex_deposit_addresses) {
+                    transfer_to = transfer_to.toLowerCase().replace(/(\r\n|\n|\r)/gm, "");
+                    if (unique_cex.indexOf(transfer_to) === -1) {
+                        unique_cex.push(transfer_to);
+                    } else {
+                        duplicates += 1;
+                        console.log(`::ERROR FOUND DUPLICATED: ${transfer_to}`);
+                    }
+                }
+                console.log(`::INFO START SET DEX ADDRESSES: TOTAL UNIQUE CEX ADDRESSES: ${unique_cex.length} : DUPLICATES: ${duplicates}`);
                 let set = 0;
                 for (let item of WALLETS) {
                     if (!item.transfer_to) {
