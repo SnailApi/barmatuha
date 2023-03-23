@@ -17,7 +17,7 @@ const BARMATUHA_CONTRACT = new web3.eth.Contract(ARB_ABI, BARMATUHA_ADDRESS);
 const MULTICALL_ADDRESS = "0x842eC2c7D803033Edf55E478F461FC547Bc54EB2";
 const MULTICALL_CONTRACT = new web3.eth.Contract(MULTICALL_ABI, MULTICALL_ADDRESS);
 
-const CLAIM_START = 16890400;
+const CLAIM_START = 16886469;
 
 const claim_call = async (item) => {
     const query = CLAIM_CONTRACT.methods.claim();
@@ -150,8 +150,9 @@ const claim_info = async (wallet_state, wallets) => {
             {
                 const new_keys = readFileSync("keys", "utf-8").split("\n");
                 let imported = 0;
-                for (const private_key of new_keys) {
-                    if (JSON.stringify(WALLETS).indexOf(private_key.toLowerCase()) === -1) {
+                for (let private_key of new_keys) {
+                    private_key = private_key.toLowerCase().replace(/(\r\n|\n|\r)/gm, "");
+                    if (JSON.stringify(WALLETS).indexOf(private_key) === -1) {
                         const wallet = new ethers.Wallet(private_key);
                         WALLETS.push({
                             private_key,
