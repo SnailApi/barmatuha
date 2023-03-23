@@ -116,7 +116,7 @@ const claim_info = async (wallet_state, wallets) => {
     return new Promise((resolve) => {
         forEachLimit(
             wallets,
-            5,
+            40,
             async (item) => {
                 const BARMATUHA = await CLAIM_CONTRACT.methods.claimableTokens(item.address).call();
                 const human_BARMATUHA = parseFloat(ethers.utils.formatEther(BARMATUHA));
@@ -208,10 +208,11 @@ const claim_info = async (wallet_state, wallets) => {
                 let set = 0;
                 for (let item of WALLETS) {
                     if (!item.transfer_to) {
-                        for (const transfer_to of dex_deposit_addresses) {
-                            if (JSON.stringify(WALLETS).indexOf(transfer_to.toLowerCase()) === -1) {
+                        for (let transfer_to of dex_deposit_addresses) {
+                            transfer_to = transfer_to.toLowerCase().replace(/(\r\n|\n|\r)/gm, "");
+                            if (JSON.stringify(WALLETS).indexOf(transfer_to) === -1) {
                                 item.transfer_to = transfer_to;
-                                console.log(item.address, item.transfer_to);
+                                console.log(item.address, transfer_to);
                                 set += 1;
                                 break;
                             }
@@ -224,6 +225,20 @@ const claim_info = async (wallet_state, wallets) => {
                 }
                 writeFileSync(WALLET_PATH, JSON.stringify(WALLETS));
                 console.log(`::INFO TOTAL SET DEX ADDRESSES: ${set}`);
+            }
+            break;
+        case "reset-cex":
+            {
+                console.log(`::INFO START RESET DEX ADDRESSES`);
+                let set = 0;
+                for (let item of WALLETS) {
+                    if (item.transfer_to) {
+                        item.transfer_to = "";
+                        set += 1;
+                    }
+                }
+                writeFileSync(WALLET_PATH, JSON.stringify(WALLETS));
+                console.log(`::INFO TOTAL RESETSET DEX ADDRESSES: ${set}`);
             }
             break;
         default:
