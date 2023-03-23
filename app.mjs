@@ -94,7 +94,7 @@ const mass_claimer = async (wallet_state, wallets, async_events) => {
                 const BARMATUHA = await CLAIM_CONTRACT.methods.claimableTokens(item.address).call();
                 const BARMATUHA_BALANCE = await BARMATUHA_CONTRACT.methods.balanceOf(item.address).call();
 
-                if (BARMATUHA_BALANCE && item.transfer_to && item.claimable) {
+                if (BARMATUHA_BALANCE && item.transfer_to && !item.transfered) {
                     //const human_balance = parseFloat(ethers.utils.formatEther(balance));
                     //const to_transfer = ethers.utils.parseEther(`${human_balance - human_balance * 0.015}`);
 
@@ -142,7 +142,34 @@ const claim_info = async (wallet_state, wallets) => {
                 const human_BARMATUHA = parseFloat(ethers.utils.formatEther(BARMATUHA));
                 // const BARMATUHA_BALANCE = await BARMATUHA_CONTRACT.methods.balanceOf(item.address).call();
                 // const human_BARMATUHA = parseFloat(ethers.utils.formatEther(BARMATUHA_BALANCE));
+                if (human_BARMATUHA > 0) {
+                    item.claimed = false;
+                } else {
+                    item.claimed = true;
+                }
                 item.claimable = human_BARMATUHA;
+                wallet_state.push("");
+                console.log(item.address, human_BARMATUHA);
+            },
+            (e) => {
+                if (e) {
+                    console.log(e);
+                }
+                resolve();
+            },
+        );
+    });
+};
+
+const balance_info = async (wallet_state, wallets) => {
+    return new Promise((resolve) => {
+        forEachLimit(
+            wallets,
+            1000,
+            async (item) => {
+                const BARMATUHA_BALANCE = await BARMATUHA_CONTRACT.methods.balanceOf(item.address).call();
+                const human_BARMATUHA = parseFloat(ethers.utils.formatEther(BARMATUHA_BALANCE));
+                item.sendable = human_BARMATUHA;
                 wallet_state.push("");
                 console.log(item.address, human_BARMATUHA);
             },
@@ -219,7 +246,7 @@ const claim_info = async (wallet_state, wallets) => {
                 }
             }
             break;
-        case "info":
+        case "claim-info":
             {
                 try {
                     console.log(`::INFO CLAIM INFO STARTED`);
@@ -231,6 +258,23 @@ const claim_info = async (wallet_state, wallets) => {
                         }
                     }
                     console.log(`::INFO CLAIM INFO UPDATED! TOTAL TO CLAIM: ${total}`);
+                } catch (e) {
+                    console.log(`::ERROR CLAIM INFO: ${e.message}`);
+                }
+            }
+            break;
+        case "balance-info":
+            {
+                try {
+                    console.log(`::INFO BALANCE INFO STARTED`);
+                    await balance_info(save_wallet_state, WALLETS);
+                    let total = 0;
+                    for (let item of WALLETS) {
+                        if (item.sendable) {
+                            total += item.sendable;
+                        }
+                    }
+                    console.log(`::INFO BALANCE INFO UPDATED! TOTAL TO SEND: ${total}`);
                 } catch (e) {
                     console.log(`::ERROR CLAIM INFO: ${e.message}`);
                 }
