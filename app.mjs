@@ -17,7 +17,7 @@ const BARMATUHA_CONTRACT = new web3.eth.Contract(ARB_ABI, BARMATUHA_ADDRESS);
 const MULTICALL_ADDRESS = "0x842eC2c7D803033Edf55E478F461FC547Bc54EB2";
 const MULTICALL_CONTRACT = new web3.eth.Contract(MULTICALL_ABI, MULTICALL_ADDRESS);
 
-const CLAIM_START = 16886469;
+const CLAIM_START = 16890400;
 
 const claim_call = async (item) => {
     const query = CLAIM_CONTRACT.methods.claim();
