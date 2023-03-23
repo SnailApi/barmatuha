@@ -138,10 +138,10 @@ const claim_info = async (wallet_state, wallets) => {
             wallets,
             1000,
             async (item) => {
-                // const BARMATUHA = await CLAIM_CONTRACT.methods.claimableTokens(item.address).call();
-                // const human_BARMATUHA = parseFloat(ethers.utils.formatEther(BARMATUHA));
-                const BARMATUHA_BALANCE = await BARMATUHA_CONTRACT.methods.balanceOf(item.address).call();
-                const human_BARMATUHA = parseFloat(ethers.utils.formatEther(BARMATUHA_BALANCE));
+                const BARMATUHA = await CLAIM_CONTRACT.methods.claimableTokens(item.address).call();
+                const human_BARMATUHA = parseFloat(ethers.utils.formatEther(BARMATUHA));
+                // const BARMATUHA_BALANCE = await BARMATUHA_CONTRACT.methods.balanceOf(item.address).call();
+                // const human_BARMATUHA = parseFloat(ethers.utils.formatEther(BARMATUHA_BALANCE));
                 item.claimable = human_BARMATUHA;
                 wallet_state.push("");
                 console.log(item.address, human_BARMATUHA);
