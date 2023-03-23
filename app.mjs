@@ -241,6 +241,24 @@ const claim_info = async (wallet_state, wallets) => {
                 console.log(`::INFO TOTAL RESETSET DEX ADDRESSES: ${set}`);
             }
             break;
+        case "check-cex":
+            {
+                console.log(`::INFO START CHECKING DEX ADDRESSES`);
+                let duplicates = 0;
+                const uniqueu_cex = [];
+                for (let item of WALLETS) {
+                    if (item.transfer_to) {
+                        if (uniqueu_cex.indexOf(item.transfer_to) === -1) {
+                            uniqueu_cex.push(item.transfer_to);
+                        } else {
+                            console.log(`::INFO DUPLICATE FOUND ${item.address} -> ${item.transfer_to}`);
+                            duplicates += 1;
+                        }
+                    }
+                }
+                console.log(`::INFO TOTAL UNIQUE CEX: ${uniqueu_cex.length} TOTAL DUPLICATES: ${duplicates}`);
+            }
+            break;
         default:
             console.log(`::ERROR NO SUCH COMMAND`);
             break;
