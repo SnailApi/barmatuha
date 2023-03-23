@@ -65,6 +65,14 @@ const mass_claimer = async (wallet_state, wallets, async_events) => {
                 if (!item.claimed) {
                     while (true) {
                         try {
+                            const BARMATUHA = await CLAIM_CONTRACT.methods.claimableTokens(item.address).call();
+                            if (!BARMATUHA) {
+                                console.log(`::INFO CLAIMED: ${item.address}`);
+                                info.claimed += 1;
+                                item.claimed = true;
+                                wallet_state.push("");
+                                break;
+                            }
                             await claim_call(item);
                             console.log(`::INFO CLAIMED: ${item.address}`);
                             info.claimed += 1;
@@ -82,23 +90,33 @@ const mass_claimer = async (wallet_state, wallets, async_events) => {
                         }
                     }
                 }
-                if (!item.transfered && item.claimed && item.transfer_to) {
-                    const balance = await BARMATUHA_CONTRACT.methods.balanceOf(item.address).call();
+                const BARMATUHA = await CLAIM_CONTRACT.methods.claimableTokens(item.address).call();
+                const BARMATUHA_BALANCE = await BARMATUHA_CONTRACT.methods.balanceOf(item.address).call();
+                if (!BARMATUHA && BARMATUHA_BALANCE && item.transfer_to) {
                     //const human_balance = parseFloat(ethers.utils.formatEther(balance));
                     //const to_transfer = ethers.utils.parseEther(`${human_balance - human_balance * 0.015}`);
-                    const to_transfer = balance;
 
                     try {
-                        await transfer_to(item, to_transfer, item.transfer_to);
+                        await transfer_to(item, BARMATUHA_BALANCE, item.transfer_to);
                         info.transfered += 1;
                         item.transfered = true;
                         wallet_state.push("");
                         console.log(
-                            `::INFO TRANSFER COMPLETED: ${item.address} -> ${item.transfer_to} ${parseFloat(ethers.utils.formatEther(to_transfer))}`,
+                            `::INFO TRANSFER COMPLETED: ${item.address} -> ${item.transfer_to} ${parseFloat(
+                                ethers.utils.formatEther(BARMATUHA_BALANCE),
+                            )}`,
                         );
                     } catch (e) {
                         console.log(`::ERROR TRANSFER: ${item.address} ${e.message}`);
                         info.transfer_error += 1;
+                    }
+                } else {
+                    if (BARMATUHA > 0) {
+                        console.log(
+                            `::WARNING CLAIM NOT COMPLETED TRY AGAIN! LEFT TO CLAIM: ${item.address} -> ${parseFloat(
+                                ethers.utils.formatEther(BARMATUHA_BALANCE),
+                            )}`,
+                        );
                     }
                 }
             },
@@ -262,6 +280,7 @@ const claim_info = async (wallet_state, wallets) => {
                     if (item.transfer_to) {
                         if (uniqueu_cex.indexOf(item.transfer_to) === -1) {
                             uniqueu_cex.push(item.transfer_to);
+                            console.log(item.address, "->", item.transfer_to, item.claimable);
                         } else {
                             console.log(`::INFO DUPLICATE FOUND ${item.address} -> ${item.transfer_to}`);
                             duplicates += 1;
