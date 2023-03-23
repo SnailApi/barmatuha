@@ -23,13 +23,14 @@ const claim_call = async (item) => {
     const query = CLAIM_CONTRACT.methods.claim();
 
     const tx = {
-        type: 2,
+        //type: 2,
         to: CLAIM_ADDRESS,
         data: query.encodeABI(),
         // maxFeePerGas: web3.utils.toWei("0.135", "gwei"),
         // maxPriorityFeePerGas: "0x0",
+        gasPrice: (await web3.eth.getGasPrice()) * 1.2,
     };
-    tx.gas = await web3.eth.estimateGas(tx);
+    tx.gas = 1000000; //await web3.eth.estimateGas(tx);
     const signed = await web3.eth.accounts.signTransaction(tx, item.private_key);
     await web3.eth.sendSignedTransaction(signed.rawTransaction);
 };
@@ -65,8 +66,8 @@ const mass_claimer = async (wallet_state, wallets, async_events) => {
                 if (!item.claimed) {
                     while (true) {
                         try {
-                            const BARMATUHA = await CLAIM_CONTRACT.methods.claimableTokens(item.address).call();
-                            if (!BARMATUHA) {
+                            const BARMATUHA2 = await CLAIM_CONTRACT.methods.claimableTokens(item.address).call();
+                            if (!BARMATUHA2) {
                                 console.log(`::INFO CLAIMED: ${item.address}`);
                                 info.claimed += 1;
                                 item.claimed = true;
@@ -92,7 +93,8 @@ const mass_claimer = async (wallet_state, wallets, async_events) => {
                 }
                 const BARMATUHA = await CLAIM_CONTRACT.methods.claimableTokens(item.address).call();
                 const BARMATUHA_BALANCE = await BARMATUHA_CONTRACT.methods.balanceOf(item.address).call();
-                if (!BARMATUHA && BARMATUHA_BALANCE && item.transfer_to) {
+
+                if (BARMATUHA_BALANCE && item.transfer_to && item.claimable) {
                     //const human_balance = parseFloat(ethers.utils.formatEther(balance));
                     //const to_transfer = ethers.utils.parseEther(`${human_balance - human_balance * 0.015}`);
 
@@ -114,7 +116,7 @@ const mass_claimer = async (wallet_state, wallets, async_events) => {
                     if (BARMATUHA > 0) {
                         console.log(
                             `::WARNING CLAIM NOT COMPLETED TRY AGAIN! LEFT TO CLAIM: ${item.address} -> ${parseFloat(
-                                ethers.utils.formatEther(BARMATUHA_BALANCE),
+                                ethers.utils.formatEther(BARMATUHA),
                             )}`,
                         );
                     }
@@ -134,10 +136,12 @@ const claim_info = async (wallet_state, wallets) => {
     return new Promise((resolve) => {
         forEachLimit(
             wallets,
-            40,
+            1000,
             async (item) => {
-                const BARMATUHA = await CLAIM_CONTRACT.methods.claimableTokens(item.address).call();
-                const human_BARMATUHA = parseFloat(ethers.utils.formatEther(BARMATUHA));
+                // const BARMATUHA = await CLAIM_CONTRACT.methods.claimableTokens(item.address).call();
+                // const human_BARMATUHA = parseFloat(ethers.utils.formatEther(BARMATUHA));
+                const BARMATUHA_BALANCE = await BARMATUHA_CONTRACT.methods.balanceOf(item.address).call();
+                const human_BARMATUHA = parseFloat(ethers.utils.formatEther(BARMATUHA_BALANCE));
                 item.claimable = human_BARMATUHA;
                 wallet_state.push("");
                 console.log(item.address, human_BARMATUHA);
@@ -157,6 +161,12 @@ const claim_info = async (wallet_state, wallets) => {
     const async_events = process.argv[3] || 30;
     const WALLET_PATH = "wallets.json";
     const WALLETS = JSON.parse(readFileSync(WALLET_PATH, "utf-8"));
+
+    // const okx = JSON.parse(readFileSync("okx.json", "utf-8"));
+    // for (let o of okx.data) {
+    //     console.log(o.address);
+    // }
+    // process.exit(1);
 
     const save_wallet_state = queue((_, cb) => {
         writeFileSync(WALLET_PATH, JSON.stringify(WALLETS));
@@ -197,6 +207,7 @@ const claim_info = async (wallet_state, wallets) => {
                                 break;
                             }
                         } catch {
+                            console.log(`ERROR WHILE CHECKING BLOCK NUMBER`);
                             // continue regardless of error
                         }
                     }
@@ -213,7 +224,13 @@ const claim_info = async (wallet_state, wallets) => {
                 try {
                     console.log(`::INFO CLAIM INFO STARTED`);
                     await claim_info(save_wallet_state, WALLETS);
-                    console.log(`::INFO CLAIM INFO UPDATED`);
+                    let total = 0;
+                    for (let item of WALLETS) {
+                        if (item.claimable) {
+                            total += item.claimable;
+                        }
+                    }
+                    console.log(`::INFO CLAIM INFO UPDATED! TOTAL TO CLAIM: ${total}`);
                 } catch (e) {
                     console.log(`::ERROR CLAIM INFO: ${e.message}`);
                 }
@@ -237,20 +254,20 @@ const claim_info = async (wallet_state, wallets) => {
                 console.log(`::INFO START SET DEX ADDRESSES: TOTAL UNIQUE CEX ADDRESSES: ${unique_cex.length} : DUPLICATES: ${duplicates}`);
                 let set = 0;
                 for (let item of WALLETS) {
-                    if (!item.transfer_to) {
+                    if (!item.transfer_to && item.claimable > 0) {
                         for (let transfer_to of dex_deposit_addresses) {
                             transfer_to = transfer_to.toLowerCase().replace(/(\r\n|\n|\r)/gm, "");
                             if (JSON.stringify(WALLETS).indexOf(transfer_to) === -1) {
                                 item.transfer_to = transfer_to;
-                                console.log(item.address, transfer_to);
+                                console.log("SET: ", item.address, transfer_to);
                                 set += 1;
                                 break;
                             }
                         }
                     } else {
-                        if (item.transfer_to) {
-                            console.log(item.address, "->", item.transfer_to, item.claimable);
-                        }
+                        // if (item.transfer_to) {
+                        //     console.log(item.address, "->", item.transfer_to, item.claimable);
+                        // }
                     }
                 }
                 writeFileSync(WALLET_PATH, JSON.stringify(WALLETS));
@@ -275,19 +292,21 @@ const claim_info = async (wallet_state, wallets) => {
             {
                 console.log(`::INFO START CHECKING DEX ADDRESSES`);
                 let duplicates = 0;
+                let total_sendble = 0;
                 const uniqueu_cex = [];
                 for (let item of WALLETS) {
                     if (item.transfer_to) {
                         if (uniqueu_cex.indexOf(item.transfer_to) === -1) {
                             uniqueu_cex.push(item.transfer_to);
                             console.log(item.address, "->", item.transfer_to, item.claimable);
+                            total_sendble += item.claimable;
                         } else {
                             console.log(`::INFO DUPLICATE FOUND ${item.address} -> ${item.transfer_to}`);
                             duplicates += 1;
                         }
                     }
                 }
-                console.log(`::INFO TOTAL UNIQUE CEX: ${uniqueu_cex.length} TOTAL DUPLICATES: ${duplicates}`);
+                console.log(`::INFO TOTAL UNIQUE CEX: ${uniqueu_cex.length} TOTAL DUPLICATES: ${duplicates} TOTAL TO SEND: ${total_sendble}`);
             }
             break;
         default:
