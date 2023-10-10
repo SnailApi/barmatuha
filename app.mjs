@@ -514,9 +514,9 @@ const snapshot_mass_voter = async (wallet_state, wallets, snapshot_proposal) => 
                     if (item.snapshot_vote.indexOf(snapshot_proposal) === -1) {
                         const wallet = new ethers.Wallet(item.private_key);
                         item.address = wallet.address;
-                        const choices = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
-                        shuffleArray(choices);
-                        //const choices = 1;
+                        // const choices = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+                        // shuffleArray(choices);
+                        const choices = 1;
                         const message = snapshot_get_message(item, choices, snapshot_proposal, "arbitrumfoundation.eth");
                         const signature = await wallet._signTypedData(message.domain, message.types, message.message);
                         try {
