@@ -7,7 +7,8 @@ import HttpsProxyAgent from "https-proxy-agent";
 import fetch from "node-fetch";
 dotenv.config();
 
-import { CLAIM_ABI, ARB_ABI, MULTICALL_ABI, ARB_DOGE_CLAIM_ABI, ODOS_ABI, TALLY_VOTE_ABI } from "./abi.mjs";
+import { CLAIM_ABI, ARB_ABI, MULTICALL_ABI, ARB_DOGE_CLAIM_ABI, ODOS_ABI, TALLY_VOTE_ABI, TALLY_SECURITY_COUNCIL_ABI } from "./abi.mjs";
+import { depositThroughOkx } from "./funding.mjs";
 
 const web3 = new Web3(process.env.RPC);
 const CLAIM_ADDRESS = "0x67a24CE4321aB3aF51c2D0a4801c3E111D88C9d9";
@@ -21,6 +22,9 @@ const MULTICALL_CONTRACT = new web3.eth.Contract(MULTICALL_ABI, MULTICALL_ADDRES
 
 const TALLY_ADDRESS = "0x789fc99093b09ad01c34dc7251d0c89ce743e5a4";
 const TALLY_CONTRACT = new web3.eth.Contract(TALLY_VOTE_ABI, TALLY_ADDRESS);
+
+const TALLY_SEC_COUNCIL_ADDRESS = "0x467923b9ae90bdb36ba88eca11604d45f13b712c";
+const TALLY_SEC_COUNCIL_CONTRACT = new web3.eth.Contract(TALLY_SECURITY_COUNCIL_ABI, TALLY_SEC_COUNCIL_ADDRESS);
 /**
  * Shit parts
  */
@@ -30,6 +34,13 @@ const SHIT_ADDRESS = "0xB5B5b428e4DE365F809CeD8271D202449e5c2F72";
 const SHIT_CONTRACT = new web3.eth.Contract(ARB_ABI, SHIT_ADDRESS);
 
 const CLAIM_START = 16890400;
+
+const shuffleArray = (array) => {
+    for (let i = array.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [array[i], array[j]] = [array[j], array[i]];
+    }
+};
 
 const transfer_to = async (item, to_transfer, transfer_to) => {
     const query = BARMATUHA_CONTRACT.methods.transfer(transfer_to, to_transfer);
@@ -503,9 +514,9 @@ const snapshot_mass_voter = async (wallet_state, wallets, snapshot_proposal) => 
                     if (item.snapshot_vote.indexOf(snapshot_proposal) === -1) {
                         const wallet = new ethers.Wallet(item.private_key);
                         item.address = wallet.address;
-                        // const choices = [1, 2, 3, 4];
-                        // shuffleArray(choices);
-                        const choices = 1;
+                        const choices = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+                        shuffleArray(choices);
+                        //const choices = 1;
                         const message = snapshot_get_message(item, choices, snapshot_proposal, "arbitrumfoundation.eth");
                         const signature = await wallet._signTypedData(message.domain, message.types, message.message);
                         try {
@@ -568,9 +579,82 @@ const tally_voter = async (wallet_state, wallets, proposal) => {
                                 console.log(`::INFO ${item.address} :: TALLY VOTE :: COMPLETED`);
                                 return;
                             }
+                            item.fund_me = true;
+                            wallet_state.push("");
                             console.log(`::ERROR ${item.address} :: TALLY VOTE :: ERROR: ${e.message}`);
                         }
-                        //await new Promise((r) => setTimeout(r, Math.floor(Math.random() * (30000 - 5000 + 1) + 5000)));
+                        await new Promise((r) => setTimeout(r, Math.floor(Math.random() * (30000 - 5000 + 1) + 5000)));
+                    }
+                }
+            },
+            (e) => {
+                if (e) {
+                    console.log(e);
+                }
+                resolve();
+            },
+        );
+    });
+};
+
+const tally_security_council_vote_call = async (item, proposal, voting_power) => {
+    const members = [
+        "0xb71ca4FFbB7b58d75Ba29891ab45e9Dc12B444Ed",
+        "0xfD7631b7a5716FCA8D95207Da2A7BcD471ee0372",
+        "0x914B7c77037951EBAC9e4046093e9D1C6daE1332",
+        "0x748a1D2EDd08245d0A139d3DFFfEe92312A25C26",
+        "0x9f2b47f969c7669D532dC8FE0F1B1907a99429fC",
+        "0xf8e1492255d9428c2Fc20A98A1DeB1215C8ffEfd",
+    ];
+    const member = members[Math.floor(Math.random() * members.length)].toLowerCase().split("0x")[1];
+    const query = TALLY_CONTRACT.methods.castVoteWithReasonAndParams(
+        proposal,
+        "1",
+        "",
+        `0x000000000000000000000000${member}0000000000000000000000000000000000000000000000${voting_power}`,
+    );
+
+    const tx = {
+        type: 2,
+        from: item.address,
+        to: TALLY_SEC_COUNCIL_ADDRESS,
+        data: query.encodeABI(),
+        maxFeePerGas: web3.utils.toWei("0.135", "gwei"),
+        maxPriorityFeePerGas: web3.utils.toWei("0.0", "gwei"),
+    };
+    tx.gas = await web3.eth.estimateGas(tx);
+    const signed = await web3.eth.accounts.signTransaction(tx, item.private_key);
+    await web3.eth.sendSignedTransaction(signed.rawTransaction);
+};
+
+const security_council_voting = async (wallet_state, wallets, proposal) => {
+    return new Promise((resolve) => {
+        forEachLimit(
+            wallets,
+            1,
+            async (item) => {
+                if (item.sendable > 0) {
+                    if (!item.security_council) {
+                        item.security_council = [];
+                    }
+                    if (item.security_council.indexOf(proposal) === -1) {
+                        try {
+                            const voting_power = ethers.utils.parseEther(`${item.sendable}`).toHexString().split("0x")[1];
+                            await tally_security_council_vote_call(item, proposal, voting_power);
+                            item.security_council.push(proposal);
+                            wallet_state.push("");
+                            console.log(`::INFO ${item.address} :: TALLY SECURITY COUNCIL VOTE :: COMPLETED`);
+                        } catch (e) {
+                            if (e.message.indexOf("vote already cast") > -1) {
+                                item.security_council.push(proposal);
+                                wallet_state.push("");
+                                console.log(`::INFO ${item.address} :: TALLY SECURITY COUNCIL VOTE :: COMPLETED`);
+                                return;
+                            }
+                            wallet_state.push("");
+                            console.log(`::ERROR ${item.address} :: TALLY SECURITY COUNCIL VOTE :: ERROR: ${e.message}`);
+                        }
+                        await new Promise((r) => setTimeout(r, Math.floor(Math.random() * (30000 - 5000 + 1) + 5000)));
                     }
                 }
             },
@@ -708,6 +792,22 @@ const tally_voter = async (wallet_state, wallets, proposal) => {
                 }
             }
             break;
+        case "security-c":
+            {
+                const proposal = process.argv[3] || "60162688034199076810399696553527335539392294406806148400571326246927623831080";
+                if (!proposal) {
+                    console.log(`::ERROR :: MISSING PROPOSAL ID`);
+                    return;
+                }
+                try {
+                    console.log(`::INFO :: SECURITY COUNCIL VOTING STARTED :: ${proposal}`);
+                    await security_council_voting(save_wallet_state, WALLETS, proposal);
+                    console.log(`::INFO :: SECURITY COUNCIL VOTING COMPLETED`);
+                } catch (e) {
+                    console.log(`::ERROR CLAIM INFO: ${e.message}`);
+                }
+            }
+            break;
         case "balance-eth":
             {
                 try {
@@ -808,6 +908,15 @@ const tally_voter = async (wallet_state, wallets, proposal) => {
                 console.log(`::INFO CLAIM SHIT`);
             } catch (e) {
                 console.log(`::ERROR CLAIM SHIT: ${e.message}`);
+            }
+            break;
+        case "okx-funding":
+            try {
+                console.log(`::INFO DEPOSIT THROUGH OKX :: STARTED`);
+                await depositThroughOkx(WALLETS, save_wallet_state);
+                console.log(`::INFO DEPOSIT THROUGH OKX :: COMPLETED`);
+            } catch (e) {
+                console.log(`::ERROR DEPOSIT THROUGH OKX :: ${e.message}`);
             }
             break;
         case "swap-shit":
